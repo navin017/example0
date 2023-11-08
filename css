@@ -1,2 +1,508 @@
-# css tips and tricks
-user-select: none; //TO MAKE THE TEXT UNSELECT BY THE USER
+import { useEffect, useState } from 'react';
+import { useParams } from "react-router-dom"
+import BreadCrumbIcon from '../../../assets/images/breadcrum.png';
+import BreadCrumb from '../../../common/component/BreadCrumb.js';
+import Table from '../../../common/component/Table.js';
+import Card from '../../../common/component/Card.js';
+import {BsArrowRight} from 'react-icons/bs';
+import {BsArrowLeft} from 'react-icons/bs';
+import {useDispatch, useSelector} from 'react-redux';
+import * as API from '../../../common/api/index.js';
+import URL from "../../../common/api/constantURL.js";
+import { setSnackData, setLoading,setRolesDetails} from '../../../redux/action/userAction.js';
+import { validatePermission } from "../../../common/functions/permissionFunctions.js";
+import Confirmation from '../../../common/component/Confirmation.js';
+import {BiCommand} from "react-icons/bi"
+import "./Permissions.css"
+
+function Permissions(){
+	const rolesDetail = useSelector(state => state.userReducer.rolesDetails)
+	const userPermissions = useSelector(state => state.userReducer.userPermissions)
+	const params = useParams()
+	const [confirmation,setConfirmation] =  useState(false)
+	const [confirmationLoginRemove,setConfirmationLoginRemove] =  useState(false)
+	const [deleteData,setDeleteData] = useState([])
+	const [openRolesContainer,setOpenRolesContainer] = useState(false)
+	const [autoFocusStatus,setAutoFocusStatus] = useState(true)
+	const [roleData,setRoleData]=useState([])
+	const [editRoleData,setEditRoleData] =  useState([])
+	const [roleName,setRoleName]=useState("")
+	const [isAdvisor,setIsAdvisor]=useState(0)
+	
+	const [roleNameError,setRoleNameError]=useState(false)
+	const [errorStatus,setErrorStatus] = useState(false)
+	const [ErrorMessage,setErrorMessage]=useState("")
+
+	const [assignedWebPermissionDetails,setAssignedWebPermissionDetails] = useState([])
+	const [unAssignedWebPermissionDetails,setUnAssignedWebPermissionDetails] = useState([])
+	
+	const [assignedMobilePermissionDetails,setAssignedMobilePermissionDetails] = useState([])  
+	const [unAssignedMobilePermissionDetails,setUnAssignedMobilePermissionDetails] = useState([])
+	
+	const [selectedMobileData,setSelectedMobileData] = useState([])
+	const [selectedWebData,setSelectedWebData] = useState([])
+	
+	const [mobileUnassignedSelectAll,setMobileUnAssignedSelectAll]=useState(false)
+	const [mobileAssignedSelectAll,setMobileAssignedSelectAll]=useState(false)
+	
+	const [webUnassignedSelectAll,setwebUnAssignedSelectAll]=useState(false)
+	const [webAssignedSelectAll,setwebAssignedSelectAll]=useState(false)
+	const [parentMoveError,setParentMoveError] = useState(false)
+	const [loginPermissionIdExists, setLoginPermissionIdExists] = useState(false)
+	const [loginPermissionId, setLoginPermissionId] = useState(null)
+	const dispatch = useDispatch()
+	let tableHeaders = [
+		{ id: 'roleName', label: 'Web permissions', width: 200,dataTestid:"roleName", responsive: true, sortable: true },
+        { id: 'Mobile permission', label: 'Mobile permissions', width: 200,dataTestid:"roleName", responsive: true, sortable: true },
+	]
+	useEffect(()=>{
+		dispatch(setLoading(true))
+		fetcRoleDetails();
+	},[])
+
+	
+	const fetcRoleDetails = async () => {
+		let response = await API.getAPI(URL.rolesByFacilityPermission + "?facilityId=" + localStorage.getItem("facilityId"))
+		dispatch(setLoading(false))
+		if (response.fetchStatus === "success") {
+			if (response.result.status === "success") {
+				let userListTypes = response.result.result
+				console.log(userListTypes.permissions.web.length)
+				for(let i=0;i<userListTypes.permissions.web.length;i++){
+					let permissionDetails = [];
+					permissionDetails.push(userListTypes.permissions.web);
+					userListTypes.permissions.web[i].roleName = permissionDetails
+				}
+				dispatch(setRolesDetails(userListTypes))
+			} else {
+				let snackData = {
+					showSnack:true,
+					snackMessage:response.result.message,
+					snackVariant:"error"
+				}
+				dispatch(setSnackData(snackData))
+			}
+		} else if (response.fetchStatus === "failure") {
+			let snackData = {
+				showSnack:true,
+				snackMessage:"Server down. Failed to fetch.",
+				snackVariant:"error"
+			}
+			dispatch(setSnackData(snackData))
+		}	
+	}
+   
+	const BreadCrumbArr = [
+		{link:"/home/dashboard",display:"Dashboard",type:"react"},
+		{link:'',display:<img src={BreadCrumbIcon}/>,type:'img'},
+		{link:"/home/users",display:"Users and Groups",type:"react"},
+		{link:'',display:<img src={BreadCrumbIcon}/>,type:'img'},
+		{link:"/home/roles",display:"Roles",type:"react"},
+	];
+	const showEditAction=(data)=>{
+		setErrorMessage("")
+		setRoleNameError(false)
+		setErrorStatus(false)
+		 document.querySelector(".roles-page").scrollTo({
+			top: 0,
+			behavior: "smooth",
+		})
+		setAutoFocusStatus(true)
+		setEditRoleData(data)
+		setOpenRolesContainer(true)
+	}
+	function showDeleteAction(data){
+		setOpenRolesContainer(false)
+		setEditRoleData([])
+		setConfirmation(true)
+		setDeleteData(data)
+	}
+	const deleteRole = async()=>{
+		dispatch(setLoading(true))
+		let data = {
+			"id": deleteData.id
+		}
+		let response = await API.deleteAPI(URL.roles, data)
+		dispatch(setLoading(false))
+		if(response.fetchStatus === "success"){
+			if(response.result.status === "success"){
+				let snackData = {
+					showSnack:true,
+					snackMessage:response.result.message,
+					snackVariant:"success"
+				}
+				setConfirmation(false)
+				fetcRoleDetails()
+				dispatch(setSnackData(snackData))
+			}else{
+				let snackData = {
+					showSnack:true,
+					snackMessage:response.result.message,
+					snackVariant:"error"
+				}
+				dispatch(setSnackData(snackData))
+			}
+		}else if(response.fetchStatus === "failure"){
+			let snackData = {
+				showSnack:true,
+				snackMessage:"Unable to delete. Try Again!",
+				snackVariant:"error"
+			}
+			dispatch(setSnackData(snackData))
+		}
+	}
+	useEffect(() => {
+		let mobileAssignedPermission = []
+		let mobileUnAssignedPermission = []
+		let webAssignedPermission = [];
+		let webUnAssignedPermission = [];
+		if(Object.keys(rolesDetail).length > 0){
+			setRoleData(rolesDetail.permissions.mobile)
+			// rolesDetail.permissions.web.map((webPermissionData)=>{  
+			// 	webUnAssignedPermission.push({id:webPermissionData.id,item:webPermissionData.description,refName:webPermissionData.refName})   
+			// })
+			rolesDetail.permissions.mobile.map((mobilePermissionData)=>{
+					mobileUnAssignedPermission.push({id:mobilePermissionData.id,item:mobilePermissionData.description,refName : mobilePermissionData.refName})
+			})
+			setUnAssignedWebPermissionDetails(webUnAssignedPermission)
+			setUnAssignedMobilePermissionDetails(mobileUnAssignedPermission)
+			setAssignedMobilePermissionDetails(mobileAssignedPermission)
+			setAssignedWebPermissionDetails(webAssignedPermission)
+		}  
+	}, [rolesDetail]);
+
+	useEffect(() => {
+		if (rolesDetail.roles) {
+			for (let index = 0; index < rolesDetail.permissions.length; index++) {
+				const userType = rolesDetail.permissions[index];
+				if (params.roleId && userType.id == params.roleId) {
+					showEditAction(userType)
+				}
+			}
+		}
+	}, [rolesDetail]);
+	
+	const selectMobileData=(data)=>{
+		setSelectedMobileData([...data])
+	}
+	const selectWebData=(data)=>{
+		setSelectedWebData([...data])
+	}
+	const selectMobileDataMobile=(data)=>{
+		setErrorStatus(false)
+		let tempSelectedMobileData = selectedMobileData;
+		let index = tempSelectedMobileData.indexOf(data)
+		if (index > -1) {
+			tempSelectedMobileData.splice(index, 1);
+		}else{
+			tempSelectedMobileData.push(data)
+		}
+		setSelectedMobileData([...tempSelectedMobileData])
+	}
+	const selectWebDataMobile=(data)=>{
+		setErrorStatus(false)
+		let tempSelectedWeb = selectedWebData;
+		let index = tempSelectedWeb.indexOf(data)
+		if (index > -1) {
+			tempSelectedWeb.splice(index, 1);
+		}else{
+			tempSelectedWeb.push(data)
+		}
+		setSelectedWebData([...tempSelectedWeb])
+	}
+	const selectAllMobileData =(checkStatus,data)=>{
+		if(checkStatus === true){
+			let tempIds = (data.map((data)=>{
+				return (data.id)
+			}))
+			setSelectedMobileData([...tempIds])
+		}else{
+			setSelectedMobileData([])
+		}
+	}
+	const selectAllWebData =(checkStatus,data)=>{
+	
+		if(checkStatus === true){
+			let tempIds = (data.map((data)=>{
+				return (data.id)
+			}))
+			setSelectedWebData([...tempIds])
+		}else{
+			setSelectedWebData([])
+		}
+	}
+	const moveSelectedMobilePermission = () => {
+		setMobileUnAssignedSelectAll(false)
+		setErrorStatus(false)
+		let tempAssignedValues = assignedMobilePermissionDetails
+		let tempUnAssignedValues = unAssignedMobilePermissionDetails
+		let tempSelectedUsers = selectedMobileData;
+		rolesDetail.permissions.mobile.map((user) => {  
+			if (selectedMobileData.includes(user.id) && tempUnAssignedValues.map((data)=>{return data.id}).includes(user.id)) {  
+				tempUnAssignedValues.splice(tempUnAssignedValues.findIndex(data => data.id === user.id), 1);
+				tempAssignedValues.push({id:user.id,item:user.description,refName:user.refName})
+				tempSelectedUsers.splice(tempSelectedUsers.indexOf(user.id), 1);
+			}
+		})
+		setSelectedMobileData ([...tempSelectedUsers])
+		setAssignedMobilePermissionDetails([...tempAssignedValues])
+		setUnAssignedMobilePermissionDetails([...tempUnAssignedValues])
+	}
+	const moveUnSelectedMobilePermission = () =>{
+		setMobileAssignedSelectAll(false)
+		let tempAssignedValues = assignedMobilePermissionDetails
+		let tempUnAssignedValues = unAssignedMobilePermissionDetails
+		let tempSelectedUsers = selectedMobileData;
+		rolesDetail.permissions.mobile.map((user) => {
+			if (selectedMobileData.includes(user.id) && tempAssignedValues.map((data)=>{return data.id}).includes(user.id)) {
+				
+				tempAssignedValues.splice(tempAssignedValues.findIndex(data => data.id === user.id), 1);
+				tempUnAssignedValues.push({id:user.id,item:user.description,refName:user.refName})
+				tempSelectedUsers.splice(tempSelectedUsers.indexOf(user.id), 1);
+			}
+		})
+		setSelectedMobileData ([...tempSelectedUsers])
+		setAssignedMobilePermissionDetails([...tempAssignedValues])
+		setUnAssignedMobilePermissionDetails([...tempUnAssignedValues])   
+	}
+
+	function findRelation(options){
+		let parent =[]
+		let assignedRefName= []
+		options.map((m)=>{ assignedRefName.push(m.refName)})
+
+		let parentMap = {
+			"ADD_USERS" : "VIEW_USERS", 
+			"EDIT_USERS" : "VIEW_USERS" , 
+			"DELETE_USERS" : "VIEW_USERS",
+
+			"ADD_ROLES" : "VIEW_ROLES",
+			"EDIT_ROLES" : "VIEW_ROLES", 
+			"DELETE_ROLES" : "VIEW_ROLES",
+
+			"ADD_GROUPS" : "VIEW_GROUPS", 
+			"EDIT_GROUPS" : "VIEW_GROUPS" ,
+			"DELETE_GROUPS" : "VIEW_GROUPS",
+
+			"ADD_DEVICES" : "VIEW_DEVICES",
+			"EDIT_DEVICES" : "VIEW_DEVICES", 
+			"DELETE_DEVICES" : "VIEW_DEVICES", 
+
+			"ADD_ALARMS" : "VIEW_ALARMS" , 
+			"EDIT_ALARMS" : "VIEW_ALARMS" , 
+			"DELETE_ALARMS" : "VIEW_ALARMS",
+
+			"ADD_MUSTERING_LOCATION" : "VIEW_MUSTERING_LOCATION" , 
+			"EDIT_MUSTERING_LOCATION" : "VIEW_MUSTERING_LOCATION" , 
+			"DELETE_MUSTERING_LOCATION" : "VIEW_MUSTERING_LOCATION" , 
+
+			"UPDATE_SERVER_CONFIG" : "VIEW_SERVER_CONFIG",
+
+			"UPDATE_SERVICE_ALLOC" : "VIEW_SERVICE_ALLOC",
+
+			"UPDATE_PROPERTIES" : "VIEW_PROPERTIES",
+
+			"UPDATE_MUSTERING" : "VIEW_MUSTERING",
+
+			"EDIT_ALERT_CONFIGURATION" : "VIEW_ALERT_CONFIGURATION",
+
+			"EDIT_DEPLOYMENT_CONFIGURATION" : "VIEW_DEPLOYMENT_CONFIGURATION",
+
+			"UPDATE_PROFILE" : "VIEW_PROFILE"
+		}
+			options.map((assigned)=>{
+				let refname = assigned.refName 
+				if(parentMap[refname]) {
+					let parentRefname = parentMap[refname];
+					if(!assignedRefName.includes(parentRefname) && !parent.includes(parentRefname)){parent.push(parentRefname)}
+					}
+			})
+		return parent
+	}
+	const getRoleName= (roles,rolesRefName) =>{
+        let arr =[]
+        rolesRefName.forEach(function(role) {
+            roles.forEach(function(roleRef){
+                let grpp = roleRef.refName
+                if(role === grpp){
+                    arr.push({id:roleRef.id,item:roleRef.description,refName:roleRef.refName})
+                }
+            })
+        });
+        return arr
+    }
+	const moveSelectedWebPermissions = () =>{
+		setParentMoveError("")
+		setErrorStatus(false)
+		setwebUnAssignedSelectAll(false)
+		let tempAssignedValues = assignedWebPermissionDetails
+		let tempUnAssignedValues = unAssignedWebPermissionDetails
+		let tempSelectedUsers = selectedWebData;
+	
+		rolesDetail.permissions.web.map((user) => {
+			if (selectedWebData.includes(user.id) && tempUnAssignedValues.map((data)=>{return data.id}).includes(user.id)) {
+				tempUnAssignedValues.splice(tempUnAssignedValues.findIndex(data => data.id === user.id), 1);
+				tempAssignedValues.push({id:user.id,item:user.description,refName:user.refName})
+				tempSelectedUsers.splice(tempSelectedUsers.indexOf(user.id), 1);  
+			}
+		})
+		let parent = findRelation(tempAssignedValues)
+		
+		let refNameArr = getRoleName(rolesDetail.permissions.web,parent)
+		refNameArr && refNameArr.map((p)=>{
+			tempAssignedValues.push(p)
+			tempUnAssignedValues.splice(tempUnAssignedValues.findIndex(data => data.id === p.id),1)
+			tempSelectedUsers.splice(tempSelectedUsers.indexOf(p.id), 1);  
+		})
+		setSelectedWebData ([...tempSelectedUsers])
+		setAssignedWebPermissionDetails([...tempAssignedValues])
+		setUnAssignedWebPermissionDetails([...tempUnAssignedValues])
+	}
+
+	const moveUnSelectedWebPermission =()=>{
+		setParentMoveError("")
+		setwebAssignedSelectAll(false)
+		let tempAssignedValues = assignedWebPermissionDetails
+		let tempUnAssignedValues = unAssignedWebPermissionDetails
+		let tempSelectedUsers = selectedWebData;
+	
+		rolesDetail.permissions.web.map((user) => {
+			if (selectedWebData.includes(user.id) && tempAssignedValues.map((data)=>{return data.id}).includes(user.id)) {
+				tempAssignedValues.splice(tempAssignedValues.findIndex(data => data.id === user.id), 1);
+				tempUnAssignedValues.push({id:user.id,item:user.description})
+				tempSelectedUsers.splice(tempSelectedUsers.indexOf(user.id), 1);
+			}
+		})
+
+		let parent = findRelation(tempAssignedValues)
+		let refNameArr = getRoleName(rolesDetail.permissions.web,parent)
+
+		refNameArr.map((p)=>{
+			if(refNameArr.includes(p)){
+				setParentMoveError(`Cannot move "${p.item}" since its dependent permissions are in chosen web permission`)
+			}
+			tempAssignedValues.push(p)
+			tempUnAssignedValues.splice(tempUnAssignedValues.findIndex(data => data.id === p.id),1)
+			tempSelectedUsers.splice(tempSelectedUsers.indexOf(p.id), 1);  
+		})
+		setSelectedWebData ([...tempSelectedUsers])
+		setAssignedWebPermissionDetails([...tempAssignedValues])
+		setUnAssignedWebPermissionDetails([...tempUnAssignedValues])
+	}
+	const addFormSubmitHandler =async(proceed)=>{
+		setConfirmationLoginRemove(false)
+		let permissionIds = []
+		assignedMobilePermissionDetails.map((data)=>{
+			permissionIds.push(data.id)
+		})
+		assignedWebPermissionDetails.map((data)=>{
+			permissionIds.push(data.id)
+		})
+		if(!roleName.trim().length > 0){   
+			setErrorMessage("Required Field")
+			return setRoleNameError(true)
+		}
+		if(!permissionIds.includes(loginPermissionId) && loginPermissionIdExists && proceed){
+			setConfirmationLoginRemove(true)
+			return setErrorStatus(true)
+		}
+		// if(!permissionIds.length > 0){
+		// 	setErrorMessage("Role should have atleast one permission.Select Permission.")
+		// 	return setErrorStatus(true)
+		// }
+		
+		let data = {
+			"roleName":roleName.trim(),
+			"isAdvisor":isAdvisor,
+			"permissionIds":permissionIds,
+			"facilityId":localStorage.getItem("facilityId"),
+			"isCanLoginRemoved": !proceed,
+		}
+		let response;
+		if(Object.keys(editRoleData).length > 0){
+			data.id = editRoleData.id
+			response = await API.putAPI(URL.permissions, data)
+		}else{
+			response = await API.postAPI(URL.permissions, data)
+		}
+		
+		dispatch(setLoading(false))
+		if(response.fetchStatus === "success"){ 
+			if(response.result.status === "success"){
+				let snackData = {
+					showSnack:true,
+					snackMessage:response.result.message,
+					snackVariant:"success"
+				}
+				dispatch(setSnackData(snackData))
+				setRoleName("")
+				setIsAdvisor(0)
+				fetcRoleDetails();
+				setOpenRolesContainer(false)
+			}else{
+				let snackData = {
+					showSnack:true,
+					snackMessage:response.result.message,
+					snackVariant:"error"
+				}
+				dispatch(setSnackData(snackData))
+			}             
+		}else{
+			let snackData = {
+				showSnack:true,
+				snackMessage:"Unable add. Try again!",
+				snackVariant:"error"
+			}
+			dispatch(setSnackData(snackData))
+		}
+	}
+	if (validatePermission(userPermissions, "EDIT_ROLES") || validatePermission(userPermissions, "DELETE_ROLES")) {
+		tableHeaders.push({ id: 'manage', label: 'MANAGE', type: 'action', path: '2', width: 100, responsive: true })
+	}
+	return (
+		<div className="roles-page">
+			<BreadCrumb  crumbs={BreadCrumbArr} dataTestid="roles-page-breadcrum" ></BreadCrumb>
+			<div className="roles-container">
+				<div className="permission-listing-conatiner">
+					<div className="roles-listing-title" data-testid="roles-title">
+						Permission Management Options
+					</div>
+					{validatePermission(userPermissions, "ADD_ROLES") ? 
+						<div className="create-btn">
+							<button className='create-roles-btn'  id="roles-create-new-role-btn" data-testid="roles-create-new-role-btn">Create New Permission</button>
+						</div>
+					:null}
+					{validatePermission(userPermissions, "EDIT_ROLES") || validatePermission(userPermissions, "DELETE_ROLES") ?
+						<div className="create-role-description" data-testid="manage-role-description">
+							{validatePermission(userPermissions, "EDIT_ROLES") ?
+								"Select the Edit Icon Below to Manage Roles."
+							:null}
+							{validatePermission(userPermissions, "DELETE_ROLES") ?
+								" You Can Select Delete Icon to Remove Roles"
+							: null}
+						</div>
+					: null}
+					<div className="roles-list">
+						<Table
+							headers={tableHeaders}
+							data={roleData}
+							defaultOrderBy={"role"}
+							defaultSortOrder={"asc"}
+							editAction={validatePermission(userPermissions, "EDIT_ROLES") ? (data) => showEditAction(data) : null}
+							deleteAction={validatePermission(userPermissions, "DELETE_ROLES") ? (data) => showDeleteAction(data) : null}
+							isTitleVisible={false}
+						/>
+					</div>
+				</div>
+			</div>
+			{confirmationLoginRemove &&
+					<Confirmation buttonValue="Proceed" deleteMessage={"!! All Users will be automatically logged out when ‘Can login’ permission is removed."} successFunc={() => { addFormSubmitHandler(false)}} cancelFunc={() => setConfirmationLoginRemove(false)} />
+			}
+			{confirmation &&
+					<Confirmation  deleteMessage={"Are you sure you want to delete role "+deleteData.roleName+"?"} successFunc={() => deleteRole()} cancelFunc={() => setConfirmation(false)} />
+			}
+		</div>
+	)
+}
+export default Permissions;
+
